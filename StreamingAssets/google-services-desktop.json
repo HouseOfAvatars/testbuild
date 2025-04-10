@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "219254576047",
+    "project_id": "hoaa-771e0",
+    "storage_bucket": "hoaa-771e0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:219254576047:android:1d12f8519536144994555a",
+        "android_client_info": {
+          "package_name": "com.DefaultCompany.Firebase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD69TMYKx8X32FJslBbVAuUVz4aRRaAgTw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -4,24 +4,54 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Unity Web Player | House of Avatars</title>
+    <style>
+      body {
+        text-align: center;
+        padding: 0;
+        border: 0;
+        margin: 0;
+        overflow: hidden; /* Evita rolagem na tela */
+        background-color: #231F20;
+      }
+      #unity-canvas {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        background: #231F20;
+      }
+    </style>
   </head>
-  <body style="text-align: center; padding: 0; border: 0; margin: 0;">
-    <canvas id="unity-canvas" width=1366 height=768 tabindex="-1" style="width: 1366px; height: 768px; background: #231F20"></canvas>
-    <script src="Build/newWebBuilds.loader.js"></script>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <script src="Build/HOAHTML.loader.js"></script>
     <script>
+      function resizeCanvas() {
+        var canvas = document.getElementById("unity-canvas");
+        var aspectRatio = 1366 / 768;
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+
+        if (width / height > aspectRatio) {
+          width = height * aspectRatio;
+        } else {
+          height = width / aspectRatio;
+        }
+
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        canvas.width = width;
+        canvas.height = height;
+      }
+
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("load", resizeCanvas);
+
       if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
         var meta = document.createElement('meta');
         meta.name = 'viewport';
         meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
         document.getElementsByTagName('head')[0].appendChild(meta);
-
-        var canvas = document.querySelector("#unity-canvas");
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        canvas.style.position = "fixed";
-
-        document.body.style.textAlign = "left";
       }
 
       createUnityInstance(document.querySelector("#unity-canvas"), {

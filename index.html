@@ -1,41 +1,224 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity Web Player | House of Avatars</title>
-  </head>
-  <body style="text-align: center; padding: 0; border: 0; margin: 0;">
-    <canvas id="unity-canvas" width=1366 height=768 tabindex="-1" style="width: 1366px; height: 768px; background: #231F20"></canvas>
-    <script src="Build/WebGL.loader.js"></script>
-    <script>
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
 
-        var canvas = document.querySelector("#unity-canvas");
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        canvas.style.position = "fixed";
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>House of Avatars</title>
+  <style>
+    /* CSS remains the same as the previous example */
+    body {
+      text-align: center;
+      padding: 0;
+      border: 0;
+      margin: 0;
+      overflow: hidden;
+      background-color: #231F20;
+      color: #cccccc;
+      font-family: sans-serif;
+    }
 
-        document.body.style.textAlign = "left";
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #231F20;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2;
+    }
+
+    #progress-bar-container {
+      width: 80%;
+      max-width: 400px;
+      height: 20px;
+      background-color: #444;
+      border: 1px solid #555;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    #progress-bar {
+      width: 0%;
+      height: 100%;
+      background-color: #4CAF50;
+      transition: width 0.1s linear;
+      /* Linear might feel better for downloads */
+    }
+
+    #progress-text {
+      font-size: 1em;
+    }
+
+    #unity-canvas {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: #231F20;
+      z-index: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Loading Progress Bar Elements -->
+  <div id="loading-overlay">
+    <div id="progress-bar-container">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="progress-text">Loading Data... 0%</div>
+  </div>
+
+  <!-- Unity Canvas -->
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+  <!-- Unity Loader Script (Still needed for createUnityInstance and other files) -->
+  <script src="Build/newWebBuilds.loader.js"></script>
+
+  <script>
+    // --- Get References to Elements ---
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const canvas = document.getElementById("unity-canvas");
+
+    // --- Original Unity Config (we'll modify dataUrl later) ---
+    const unityConfig = {
+      arguments: [],
+      // dataUrl: "Build/newWebBuilds.data", // We will set this dynamically
+      frameworkUrl: "Build/newWebBuilds.framework.js",
+      codeUrl: "Build/newWebBuilds.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "House of Avatars",
+      productName: "House of Avatars",
+      productVersion: "1.2.6.0",
+      // --- NO onProgress callback here ---
+    };
+
+    // --- Canvas Resizing (same as before) ---
+    function resizeCanvas() {
+      var aspectRatio = 1366 / 768;
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+
+      if (width / height > aspectRatio) {
+        width = height * aspectRatio;
+      } else {
+        height = width / aspectRatio;
       }
 
-      createUnityInstance(document.querySelector("#unity-canvas"), {
-        arguments: [],
-        dataUrl: "Build/WebGL.data",
-        frameworkUrl: "Build/WebGL.framework.js",
-        codeUrl: "Build/WebGL.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "House of Avatars",
-        productName: "House of Avatars",
-        productVersion: "1.2.6.0",
-        // matchWebGLToCanvasSize: false, // Uncomment this to separately control WebGL canvas render size and DOM element size.
-        // devicePixelRatio: 1, // Uncomment this to override low DPI rendering on high DPI displays.
-      });
-    </script>
-  </body>
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas(); // Initial size
+
+    // --- Mobile Viewport Meta Tag (same as before) ---
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      var meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+      document.getElementsByTagName('head')[0].appendChild(meta);
+    }
+
+    // --- Function to Fetch Data Manually and Start Unity ---
+    async function loadDataAndStartUnity() {
+      const dataUrl = "Build/newWebBuilds.data"; // The file we want to track
+      let objectUrl = null; // To store the blob: URL
+
+      try {
+        // 1. Fetch the data file
+        const response = await fetch(dataUrl);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status} for ${dataUrl}`);
+        }
+
+        const contentLength = response.headers.get('Content-Length');
+        if (!contentLength) {
+          console.warn("Content-Length header not found. Cannot display accurate progress for data file.");
+          // Fallback: Maybe show an indeterminate spinner or just "Loading..."
+          progressText.textContent = "Loading Data...";
+          progressBar.style.width = '100%'; // Or some other indicator
+        }
+
+        const totalSize = parseInt(contentLength, 10);
+        let receivedLength = 0;
+        const chunks = []; // Array to store received data chunks
+
+        // 2. Get the ReadableStream reader
+        const reader = response.body.getReader();
+
+        // 3. Read data chunks and track progress
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break; // Download finished
+          }
+
+          chunks.push(value);
+          receivedLength += value.length;
+
+          if (totalSize) {
+            const percentage = Math.round((receivedLength / totalSize) * 100);
+            progressBar.style.width = percentage + '%';
+            progressText.textContent = `Loading Data... ${percentage}%`;
+          }
+        }
+
+        // 4. Create a Blob from the chunks
+        const dataBlob = new Blob(chunks);
+
+        // 5. Create an Object URL
+        objectUrl = URL.createObjectURL(dataBlob);
+
+        // 6. Update the config and start Unity
+        unityConfig.dataUrl = objectUrl; // Use the blob URL
+        progressText.textContent = "Initializing Unity..."; // Update status
+
+        // Now call createUnityInstance with the blob URL
+        createUnityInstance(canvas, unityConfig)
+          .then((unityInstance) => {
+            console.log("Unity instance created successfully.");
+            // Optional: Small delay before hiding, or hide immediately
+            loadingOverlay.style.display = 'none';
+          })
+          .catch((message) => {
+            // Handle Unity initialization errors specifically
+            console.error("Unity Initialization Error:", message);
+            alert(`Error initializing Unity: ${message}`);
+            progressText.textContent = "Error initializing application.";
+            progressBar.style.backgroundColor = "#ff0000";
+          })
+          .finally(() => {
+            // 7. Cleanup: Revoke the object URL AFTER Unity potentially uses it
+            if (objectUrl) {
+              console.log("Revoking Blob URL:", objectUrl);
+              URL.revokeObjectURL(objectUrl);
+            }
+          });
+
+      } catch (error) {
+        // Handle errors during fetch/download
+        console.error("Download Error:", error);
+        alert(`Failed to download application data: ${error.message}`);
+        progressText.textContent = "Error downloading data.";
+        progressBar.style.backgroundColor = "#ff0000"; // Red bar for error
+        loadingOverlay.style.display = 'flex'; // Ensure overlay stays visible on error
+      }
+    }
+
+    // --- Start the process ---
+    loadDataAndStartUnity();
+
+  </script>
+</body>
+
 </html>
